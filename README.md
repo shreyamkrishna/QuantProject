@@ -4,7 +4,7 @@ Eigenvalue-based equity factor model applying Random Matrix Theory to extract
 idiosyncratic alpha signals from S&P 500 return data.
 
 Methodology directly derived from PhD work on signal extraction in high-noise
-high-dimensional datasets (radio telescope data → equity returns).
+high-dimensional datasets.
 
 ## Structure
 
