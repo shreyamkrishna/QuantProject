@@ -1,0 +1,9 @@
+numpy>=1.21
+pandas>=1.3
+scikit-learn>=1.0
+scipy>=1.7
+yfinance>=0.2
+matplotlib>=3.5
+lxml>=4.6        # required by pandas.read_html for Wikipedia scrape
+html5lib>=1.1    # fallback HTML parser for read_html
+pyarrow>=7.0     # parquet support for price cache
