@@ -107,9 +107,20 @@ def long_short_portfolio(
     for date in signal.index:
         row = signal.loc[date].dropna()
 
-        if len(row) < 20:
-            weights.loc[date] = prev_weights
-            continue
+        # --- NEW: no-trade zone ---
+        if date != signal.index[0]:
+            prev_row = signal.shift(1).loc[date].dropna()
+            common = row.index.intersection(prev_row.index)
+
+            if len(common) > 0:
+                change = (row[common] - prev_row[common]).abs().mean()
+                if change < 0.05:
+                    weights.loc[date] = prev_weights
+                    continue
+
+                if len(row) < 20:
+                    weights.loc[date] = prev_weights
+                    continue
 
         cutoff = max(1, len(row) // 10) if use_decile else n_stocks
         if len(row) < 2 * cutoff:
@@ -120,8 +131,13 @@ def long_short_portfolio(
 
         # --- target portfolio (what you WANT) ---
         target = pd.Series(0.0, index=signal.columns)
-        target[long_stocks]  =  1.0 / cutoff
-        target[short_stocks] = -1.0 / cutoff
+        long_scores  = row[long_stocks]
+        short_scores = row[short_stocks]
+
+        target = pd.Series(0.0, index=signal.columns)
+
+        target[long_stocks]  = long_scores / long_scores.abs().sum()
+        target[short_stocks] = -short_scores / short_scores.abs().sum()
 
         # --- NEW: partial rebalance ---
         new_weights = lambda_ * target + (1 - lambda_) * prev_weights
@@ -157,7 +173,7 @@ class Backtester:
 
     def run(self, weights: pd.DataFrame) -> pd.DataFrame:
         w = weights.shift(1).fillna(0)   # 1-day lag: signal today → trade tomorrow
-
+        
         common    = w.columns.intersection(self.returns.columns)
         w         = w[common]
         r         = self.returns[common]
