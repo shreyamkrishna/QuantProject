@@ -101,9 +101,14 @@ def long_short_portfolio(
     """
     weights = pd.DataFrame(0.0, index=signal.index, columns=signal.columns)
 
+    prev_weights = pd.Series(0.0, index=signal.columns)
+    lambda_ = 0.3  # 0.2–0.5 is a good range
+
     for date in signal.index:
         row = signal.loc[date].dropna()
+
         if len(row) < 20:
+            weights.loc[date] = prev_weights
             continue
 
         cutoff = max(1, len(row) // 10) if use_decile else n_stocks
@@ -113,8 +118,16 @@ def long_short_portfolio(
         long_stocks  = row.nlargest(cutoff).index
         short_stocks = row.nsmallest(cutoff).index
 
-        weights.loc[date, long_stocks]  =  1.0 / cutoff
-        weights.loc[date, short_stocks] = -1.0 / cutoff
+        # --- target portfolio (what you WANT) ---
+        target = pd.Series(0.0, index=signal.columns)
+        target[long_stocks]  =  1.0 / cutoff
+        target[short_stocks] = -1.0 / cutoff
+
+        # --- NEW: partial rebalance ---
+        new_weights = lambda_ * target + (1 - lambda_) * prev_weights
+
+        weights.loc[date] = new_weights
+        prev_weights = new_weights
 
     # Inverse-vol scaling: equalise risk contribution across positions
     if returns is not None:
