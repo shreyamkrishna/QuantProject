@@ -137,8 +137,6 @@ def long_short_portfolio(
         else:
             new_weights = lambda_ * target + (1 - lambda_) * prev_weights
 
-        if np.random.rand() < 0.01:
-            print("DEBUG WEIGHT ABS SUM:", new_weights.abs().sum())
         weights.loc[date] = new_weights
         prev_weights = new_weights
 

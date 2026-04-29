@@ -27,7 +27,7 @@ from src.evaluate   import (
 # ── Config ─────────────────────────────────────────────────────────────────────
 CACHE_PATH   = "data/prices.parquet"
 START_DATE   = "2020-01-01"
-END_DATE     = "2026-04-22"
+END_DATE     = "2026-04-29"
 SPLIT_DATE   = "2024-12-31"
 MR_LOOKBACK  = 20      # mean-reversion z-score window (days)
 MR_DECAY     = 10       # mean-reversion EWM halflife
@@ -124,12 +124,13 @@ mom_train = momentum_signal(train_returns, fast_window=MOM_FAST,
 
 # Blended signal
 # --- NEW: dynamic signal weighting ---
-mr_strength  = mr_train.abs().rolling(60).mean()
-mom_strength = mom_train.abs().rolling(60).mean()
+mr_strength  = mr_train.abs().rolling(60, min_periods=10).mean()
+mom_strength = mom_train.abs().rolling(60, min_periods=10).mean()
 
 total = mr_strength + mom_strength
-w_mr  = mr_strength / total
-w_mom = mom_strength / total
+
+w_mr  = (mr_strength / total).fillna(0.5)
+w_mom = (mom_strength / total).fillna(0.5)
 
 signal_train = w_mr * mr_train + w_mom * mom_train
 
@@ -185,6 +186,9 @@ weights_train = long_short_portfolio(
 bt = Backtester(train_returns, transaction_cost_bps=TC_BPS)
 results_train = bt.run(weights_train)
 full_report(results_train, label="(In-Sample)")
+fig_is = plot_performance(results_train, title="Eigenvalue Factor Model — In-Sample")
+fig_is.savefig("plots/is_performance.png", dpi=150, bbox_inches="tight")
+print("Saved: plots/is_performance.png")
 
 # ── 9. Out-of-sample backtest ──────────────────────────────────────────────────
 print("=" * 60)
@@ -200,12 +204,13 @@ mom_test     = momentum_signal(returns, fast_window=MOM_FAST,
                                 slow_window=MOM_SLOW, skip_days=5)
 mom_test     = mom_test.loc[test_returns.index]   # align to test period
 # --- NEW: dynamic signal weighting ---
-mr_strength  = mr_test.abs().rolling(60).mean()
-mom_strength = mom_test.abs().rolling(60).mean()
+mr_strength  = mr_test.abs().rolling(60, min_periods=10).mean()
+mom_strength = mom_test.abs().rolling(60, min_periods=10).mean()
 
 total = mr_strength + mom_strength
-w_mr  = mr_strength / total
-w_mom = mom_strength / total
+
+w_mr  = (mr_strength / total).fillna(0.5)
+w_mom = (mom_strength / total).fillna(0.5)
 
 signal_test = w_mr * mr_test + w_mom * mom_test
 
@@ -238,17 +243,18 @@ def make_signal(idio_df: pd.DataFrame, full_ret: pd.DataFrame) -> pd.DataFrame:
                            slow_window=MOM_SLOW, skip_days=5)
     
     mom = mom.loc[idio_df.index].fillna(0)
-    mr_strength  = mr.abs().rolling(60).mean()
-    mom_strength = mom.abs().rolling(60).mean()
+    mr_strength  = mr.abs().rolling(60, min_periods=10).mean()
+    mom_strength = mom.abs().rolling(60, min_periods=10).mean()
 
     total = mr_strength + mom_strength
-    w_mr  = mr_strength / total
-    w_mom = mom_strength / total
+
+    w_mr  = (mr_strength / total).fillna(0.5)
+    w_mom = (mom_strength / total).fillna(0.5)
 
     signal = w_mr * mr + w_mom * mom
 
     # 🔥 KEY LINE: drop warmup period
-    signal = signal.iloc[WARMUP:]
+    #signal = signal.iloc[WARMUP:]
     
     return signal.fillna(0)
 
