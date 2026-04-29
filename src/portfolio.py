@@ -107,21 +107,10 @@ def long_short_portfolio(
     for date in signal.index:
         row = signal.loc[date].dropna()
 
-        # --- NEW: no-trade zone ---
-        if date != signal.index[0]:
-            prev_row = signal.shift(1).loc[date].dropna()
-            common = row.index.intersection(prev_row.index)
-
-            if len(common) > 0:
-                change = (row[common] - prev_row[common]).abs().mean()
-                if change < 0.05:
-                    print("NO TRADE TRIGGERED")
-                    weights.loc[date] = prev_weights
-                    continue
-
-                if len(row) < 20:
-                    weights.loc[date] = prev_weights
-                    continue
+        if prev_weights.abs().sum() > 0:
+            if change < 0.01:
+                weights.loc[date] = prev_weights
+                continue
 
         cutoff = max(1, len(row) // 10) if use_decile else n_stocks
         if len(row) < 2 * cutoff:
