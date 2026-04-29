@@ -115,6 +115,7 @@ def long_short_portfolio(
             if len(common) > 0:
                 change = (row[common] - prev_row[common]).abs().mean()
                 if change < 0.05:
+                    print("NO TRADE TRIGGERED")
                     weights.loc[date] = prev_weights
                     continue
 
@@ -142,6 +143,8 @@ def long_short_portfolio(
         # --- NEW: partial rebalance ---
         new_weights = lambda_ * target + (1 - lambda_) * prev_weights
 
+        if np.random.rand() < 0.01:
+            print("DEBUG WEIGHT ABS SUM:", new_weights.abs().sum())
         weights.loc[date] = new_weights
         prev_weights = new_weights
 
@@ -180,6 +183,7 @@ class Backtester:
 
         gross_pnl = (w * r).sum(axis=1)
         turnover  = w.diff().abs().sum(axis=1) / 2
+        print("DEBUG TURNOVER:", turnover.describe())
         costs     = turnover * self.tc
         net_pnl   = gross_pnl - costs
 

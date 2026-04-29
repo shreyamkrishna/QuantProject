@@ -243,7 +243,8 @@ def make_signal(idio_df: pd.DataFrame, full_ret: pd.DataFrame) -> pd.DataFrame:
     total = mr_strength + mom_strength
     w_mr  = mr_strength / total
     w_mom = mom_strength / total
-
+    
+    print("DEBUG SIGNAL STD:", (w_mr * mr + w_mom * mom).std(axis=1).describe())
     return w_mr * mr + w_mom * mom
 
 bt_full    = Backtester(returns, transaction_cost_bps=TC_BPS)
