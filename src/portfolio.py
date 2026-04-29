@@ -102,7 +102,7 @@ def long_short_portfolio(
     weights = pd.DataFrame(0.0, index=signal.index, columns=signal.columns)
 
     prev_weights = pd.Series(0.0, index=signal.columns)
-    lambda_ = 0.3  # 0.2–0.5 is a good range
+    lambda_ = 0.6  # 0.2–0.5 is a good range
 
     for date in signal.index:
         row = signal.loc[date].dropna()
