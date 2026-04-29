@@ -107,30 +107,35 @@ def long_short_portfolio(
     for date in signal.index:
         row = signal.loc[date].dropna()
 
-        if prev_weights.abs().sum() > 0:
-            if change < 0.01:
-                weights.loc[date] = prev_weights
-                continue
-
+        if len(row) < 20:
+            weights.loc[date] = prev_weights
+            continue
         cutoff = max(1, len(row) // 10) if use_decile else n_stocks
         if len(row) < 2 * cutoff:
             cutoff = max(1, len(row) // 2)
+        
 
-        long_stocks  = row.nlargest(cutoff).index
-        short_stocks = row.nsmallest(cutoff).index
+        long_stocks = row.nlargest(cutoff).index
+        remaining   = row.drop(long_stocks)
+        short_stocks = remaining.nsmallest(cutoff).index
 
         # --- target portfolio (what you WANT) ---
         target = pd.Series(0.0, index=signal.columns)
         long_scores  = row[long_stocks]
         short_scores = row[short_stocks]
 
-        target = pd.Series(0.0, index=signal.columns)
-
         target[long_stocks]  = long_scores / long_scores.abs().sum()
         target[short_stocks] = -short_scores / short_scores.abs().sum()
 
+        if target.abs().sum() < 1e-6:
+            weights.loc[date] = prev_weights
+            continue
         # --- NEW: partial rebalance ---
-        new_weights = lambda_ * target + (1 - lambda_) * prev_weights
+        if target.abs().sum() < 1e-6:
+            # no signal → HOLD previous portfolio
+            new_weights = prev_weights
+        else:
+            new_weights = lambda_ * target + (1 - lambda_) * prev_weights
 
         if np.random.rand() < 0.01:
             print("DEBUG WEIGHT ABS SUM:", new_weights.abs().sum())
@@ -172,7 +177,6 @@ class Backtester:
 
         gross_pnl = (w * r).sum(axis=1)
         turnover  = w.diff().abs().sum(axis=1) / 2
-        print("DEBUG TURNOVER:", turnover.describe())
         costs     = turnover * self.tc
         net_pnl   = gross_pnl - costs
 
@@ -231,15 +235,19 @@ class Backtester:
             # Full return history up to end of test window (for momentum lookback)
             full_ret = self.returns.loc[:test.index[-1], valid_cols]
 
-            signal  = signal_fn(idio_df, full_ret)
+            signal_full = signal_fn(idio_df, full_ret)
+
+            # 🔥 align test to signal (this is the missing step)
+            test_aligned = test_clean.loc[signal_full.index]
+
             weights = long_short_portfolio(
-                signal, use_decile=True, returns=test_clean
+                signal_full, use_decile=True, returns=test_aligned
             )
 
-            window_bt      = Backtester(test_clean, transaction_cost_bps=self.tc * 10_000)
+            window_bt = Backtester(test_aligned, transaction_cost_bps=self.tc * 10_000)
             window_results = window_bt.run(weights)
-            all_results.append(window_results.loc[test.index])
 
+            all_results.append(window_results)
             win += 1
             if verbose:
                 end_date = test.index[-1].date()

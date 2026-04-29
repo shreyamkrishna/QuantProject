@@ -36,8 +36,8 @@ MOM_SLOW     = 252     # momentum: 12-month slow window
 MR_WEIGHT    = 0.3     # 30% MR / 70% momentum blend
 TC_BPS       = 7.0
 TRAIN_WINDOW = 504     # walk-forward: 2yr train (keeps T > N=490)
-TEST_WINDOW  = 63      # walk-forward: 1 quarter (gives ~12 folds)
-
+TEST_WINDOW  = 123      # walk-forward: 1 quarter (gives ~12 folds)
+WARMUP = 60
 Path("plots").mkdir(exist_ok=True)
 Path("data").mkdir(exist_ok=True)
 
@@ -236,16 +236,21 @@ def make_signal(idio_df: pd.DataFrame, full_ret: pd.DataFrame) -> pd.DataFrame:
     mr  = build_signal(idio_df, lookback=MR_LOOKBACK, decay_halflife=MR_DECAY)
     mom = momentum_signal(full_ret, fast_window=MOM_FAST,
                            slow_window=MOM_SLOW, skip_days=5)
-    mom = mom.loc[idio_df.index]   # trim to test window
+    
+    mom = mom.loc[idio_df.index].fillna(0)
     mr_strength  = mr.abs().rolling(60).mean()
     mom_strength = mom.abs().rolling(60).mean()
 
     total = mr_strength + mom_strength
     w_mr  = mr_strength / total
     w_mom = mom_strength / total
+
+    signal = w_mr * mr + w_mom * mom
+
+    # 🔥 KEY LINE: drop warmup period
+    signal = signal.iloc[WARMUP:]
     
-    print("DEBUG SIGNAL STD:", (w_mr * mr + w_mom * mom).std(axis=1).describe())
-    return w_mr * mr + w_mom * mom
+    return signal.fillna(0)
 
 bt_full    = Backtester(returns, transaction_cost_bps=TC_BPS)
 wf_results = bt_full.walk_forward(
