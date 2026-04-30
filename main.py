@@ -27,17 +27,17 @@ from src.evaluate   import (
 # ── Config ─────────────────────────────────────────────────────────────────────
 CACHE_PATH   = "data/prices.parquet"
 START_DATE   = "2020-01-01"
-END_DATE     = "2026-04-22"
+END_DATE     = "2026-04-29"
 SPLIT_DATE   = "2024-12-31"
-MR_LOOKBACK  = 10      # mean-reversion z-score window (days)
-MR_DECAY     = 5       # mean-reversion EWM halflife
+MR_LOOKBACK  = 20      # mean-reversion z-score window (days)
+MR_DECAY     = 10       # mean-reversion EWM halflife
 MOM_FAST     = 21      # momentum: 1-month fast window
 MOM_SLOW     = 252     # momentum: 12-month slow window
-MR_WEIGHT    = 0.5     # 50% MR / 50% momentum blend
+MR_WEIGHT    = 0.3     # 30% MR / 70% momentum blend
 TC_BPS       = 7.0
 TRAIN_WINDOW = 504     # walk-forward: 2yr train (keeps T > N=490)
-TEST_WINDOW  = 63      # walk-forward: 1 quarter (gives ~12 folds)
-
+TEST_WINDOW  = 123      # walk-forward: 1 quarter (gives ~12 folds)
+WARMUP = 60
 Path("plots").mkdir(exist_ok=True)
 Path("data").mkdir(exist_ok=True)
 
@@ -123,7 +123,16 @@ mom_train = momentum_signal(train_returns, fast_window=MOM_FAST,
                              slow_window=MOM_SLOW, skip_days=5)
 
 # Blended signal
-signal_train = combine_signals(mr_train, mom_train, mr_weight=MR_WEIGHT)
+# --- NEW: dynamic signal weighting ---
+mr_strength  = mr_train.abs().rolling(60, min_periods=10).mean()
+mom_strength = mom_train.abs().rolling(60, min_periods=10).mean()
+
+total = mr_strength + mom_strength
+
+w_mr  = (mr_strength / total).fillna(0.5)
+w_mom = (mom_strength / total).fillna(0.5)
+
+signal_train = w_mr * mr_train + w_mom * mom_train
 
 print(f"Signal stats:")
 print(f"  Non-null observations : {signal_train.notna().sum().sum():,}")
@@ -177,6 +186,9 @@ weights_train = long_short_portfolio(
 bt = Backtester(train_returns, transaction_cost_bps=TC_BPS)
 results_train = bt.run(weights_train)
 full_report(results_train, label="(In-Sample)")
+fig_is = plot_performance(results_train, title="Eigenvalue Factor Model — In-Sample")
+fig_is.savefig("plots/is_performance.png", dpi=150, bbox_inches="tight")
+print("Saved: plots/is_performance.png")
 
 # ── 9. Out-of-sample backtest ──────────────────────────────────────────────────
 print("=" * 60)
@@ -191,7 +203,16 @@ mr_test      = build_signal(idio_test_df, lookback=MR_LOOKBACK, decay_halflife=M
 mom_test     = momentum_signal(returns, fast_window=MOM_FAST,
                                 slow_window=MOM_SLOW, skip_days=5)
 mom_test     = mom_test.loc[test_returns.index]   # align to test period
-signal_test  = combine_signals(mr_test, mom_test, mr_weight=MR_WEIGHT)
+# --- NEW: dynamic signal weighting ---
+mr_strength  = mr_test.abs().rolling(60, min_periods=10).mean()
+mom_strength = mom_test.abs().rolling(60, min_periods=10).mean()
+
+total = mr_strength + mom_strength
+
+w_mr  = (mr_strength / total).fillna(0.5)
+w_mom = (mom_strength / total).fillna(0.5)
+
+signal_test = w_mr * mr_test + w_mom * mom_test
 
 weights_test = long_short_portfolio(
     signal_test, use_decile=True, returns=test_returns
@@ -220,8 +241,22 @@ def make_signal(idio_df: pd.DataFrame, full_ret: pd.DataFrame) -> pd.DataFrame:
     mr  = build_signal(idio_df, lookback=MR_LOOKBACK, decay_halflife=MR_DECAY)
     mom = momentum_signal(full_ret, fast_window=MOM_FAST,
                            slow_window=MOM_SLOW, skip_days=5)
-    mom = mom.loc[idio_df.index]   # trim to test window
-    return combine_signals(mr, mom, mr_weight=MR_WEIGHT)
+    
+    mom = mom.loc[idio_df.index].fillna(0)
+    mr_strength  = mr.abs().rolling(60, min_periods=10).mean()
+    mom_strength = mom.abs().rolling(60, min_periods=10).mean()
+
+    total = mr_strength + mom_strength
+
+    w_mr  = (mr_strength / total).fillna(0.5)
+    w_mom = (mom_strength / total).fillna(0.5)
+
+    signal = w_mr * mr + w_mom * mom
+
+    # 🔥 KEY LINE: drop warmup period
+    #signal = signal.iloc[WARMUP:]
+    
+    return signal.fillna(0)
 
 bt_full    = Backtester(returns, transaction_cost_bps=TC_BPS)
 wf_results = bt_full.walk_forward(

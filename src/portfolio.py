@@ -102,7 +102,7 @@ def long_short_portfolio(
     weights = pd.DataFrame(0.0, index=signal.index, columns=signal.columns)
 
     prev_weights = pd.Series(0.0, index=signal.columns)
-    lambda_ = 0.3  # 0.2–0.5 is a good range
+    lambda_ = 0.6  # 0.2–0.5 is a good range
 
     for date in signal.index:
         row = signal.loc[date].dropna()
@@ -110,21 +110,32 @@ def long_short_portfolio(
         if len(row) < 20:
             weights.loc[date] = prev_weights
             continue
-
         cutoff = max(1, len(row) // 10) if use_decile else n_stocks
         if len(row) < 2 * cutoff:
             cutoff = max(1, len(row) // 2)
+        
 
-        long_stocks  = row.nlargest(cutoff).index
-        short_stocks = row.nsmallest(cutoff).index
+        long_stocks = row.nlargest(cutoff).index
+        remaining   = row.drop(long_stocks)
+        short_stocks = remaining.nsmallest(cutoff).index
 
         # --- target portfolio (what you WANT) ---
         target = pd.Series(0.0, index=signal.columns)
-        target[long_stocks]  =  1.0 / cutoff
-        target[short_stocks] = -1.0 / cutoff
+        long_scores  = row[long_stocks]
+        short_scores = row[short_stocks]
 
+        target[long_stocks]  = long_scores / long_scores.abs().sum()
+        target[short_stocks] = -short_scores / short_scores.abs().sum()
+
+        if target.abs().sum() < 1e-6:
+            weights.loc[date] = prev_weights
+            continue
         # --- NEW: partial rebalance ---
-        new_weights = lambda_ * target + (1 - lambda_) * prev_weights
+        if target.abs().sum() < 1e-6:
+            # no signal → HOLD previous portfolio
+            new_weights = prev_weights
+        else:
+            new_weights = lambda_ * target + (1 - lambda_) * prev_weights
 
         weights.loc[date] = new_weights
         prev_weights = new_weights
@@ -157,7 +168,7 @@ class Backtester:
 
     def run(self, weights: pd.DataFrame) -> pd.DataFrame:
         w = weights.shift(1).fillna(0)   # 1-day lag: signal today → trade tomorrow
-
+        
         common    = w.columns.intersection(self.returns.columns)
         w         = w[common]
         r         = self.returns[common]
@@ -222,15 +233,19 @@ class Backtester:
             # Full return history up to end of test window (for momentum lookback)
             full_ret = self.returns.loc[:test.index[-1], valid_cols]
 
-            signal  = signal_fn(idio_df, full_ret)
+            signal_full = signal_fn(idio_df, full_ret)
+
+            # 🔥 align test to signal (this is the missing step)
+            test_aligned = test_clean.loc[signal_full.index]
+
             weights = long_short_portfolio(
-                signal, use_decile=True, returns=test_clean
+                signal_full, use_decile=True, returns=test_aligned
             )
 
-            window_bt      = Backtester(test_clean, transaction_cost_bps=self.tc * 10_000)
+            window_bt = Backtester(test_aligned, transaction_cost_bps=self.tc * 10_000)
             window_results = window_bt.run(weights)
-            all_results.append(window_results.loc[test.index])
 
+            all_results.append(window_results)
             win += 1
             if verbose:
                 end_date = test.index[-1].date()
