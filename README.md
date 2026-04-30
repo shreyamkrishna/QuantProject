@@ -44,18 +44,19 @@ Subsequent runs load from cache.
 
 ## Output
   plots/eigenvalue_spectrum.png        — RMT factor count diagnostics
+  
   plots/ic_decay_mean_reversion.png    — MR signal IC by horizon
-  plots/momentum_diagnostics.png       — 6-panel momentum dashboard:
-                                           IC decay (short+long horizons)
-                                           Daily IC time series
-                                           Top/bottom decile spread
-                                           Signal autocorrelation
-                                           Cross-sectional dispersion
-                                           Rolling ICIR
+  
+  plots/momentum_diagnostics.png       — 6-panel momentum dashboard: IC decay (short+long horizons), Daily IC time series, Top/bottom decile spread, Signal autocorrelation, Cross-sectional dispersion, Rolling ICIR
+                                           
   plots/signal_comparison_ic.png       — MR vs Momentum vs Combined IC
-  plots/is_performance.png             — in sample 4-panel dashboard
-  plots/oos_performance.png            — out of sample 4-panel dashboard
-  plots/walk_forward_performance.png   — Walk-forward out of sample dashboard
+  
+  plots/is_performance.png             — in-sample 4-panel dashboard
+  
+  plots/oos_performance.png            — out-of-sample 4-panel dashboard
+  
+  plots/walk_forward_performance.png   — Walk-forward out-of-sample dashboard
+  
 ## Requirements
 
 Python 3.9+
