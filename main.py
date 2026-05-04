@@ -314,7 +314,7 @@ mr_train = build_signal(idio_train_df, lookback=MR_LOOKBACK, decay_halflife=MR_D
 # Removing the market or sector component would strip out the very trends
 # the signal is trying to capture.
 mom_train = momentum_signal(
-    idio_train_df,   # <-- CHANGE HERE
+    train_ret_aligned,   # <-- CHANGE HERE
     fast_window=MOM_FAST,
     slow_window=MOM_SLOW,
     skip_days=5,
@@ -453,7 +453,7 @@ mr_test = build_signal(idio_test_df, lookback=MR_LOOKBACK, decay_halflife=MR_DEC
 # Momentum signal: computed on FULL history (raw returns), sliced to test dates.
 # KEY: we use the full `returns` DataFrame (all dates), then slice.
 # Using only test_returns would give all-NaN because MOM_SLOW=252d > 123d test window.
-mom_test = momentum_signal(idio_test_df, fast_window=MOM_FAST,
+mom_test = momentum_signal(returns, fast_window=MOM_FAST,
                             slow_window=MOM_SLOW, skip_days=5)
 mom_test = mom_test.loc[test_returns.index]   # slice to test dates
 
@@ -516,7 +516,7 @@ def make_signal(idio_df: pd.DataFrame, full_ret: pd.DataFrame) -> pd.DataFrame:
 
     # Momentum built on full raw returns history, then sliced to test window
     mom = momentum_signal(
-        idio_df,
+        full_ret,
         fast_window=MOM_FAST,
         slow_window=MOM_SLOW,
         skip_days=5,
