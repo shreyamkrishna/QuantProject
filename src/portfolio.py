@@ -191,6 +191,19 @@ def long_short_portfolio(
     weights = pd.DataFrame(0.0, index=signal.index, columns=signal.columns)
 
     for date in signal.index:
+        prev_weights = weights.shift(1).loc[date].fillna(0)
+        if date != signal.index[0]:
+            prev_signal = signal.shift(1).loc[date].dropna()
+            common = row.index.intersection(prev_signal.index)
+
+            if len(common) > 0:
+                change = (row[common] - prev_signal[common]).abs().mean()
+
+                # only rebalance if signal changed meaningfully
+                if prev_weights.abs().sum() > 0 and change < 0.02:
+                    weights.loc[date] = prev_weights
+                    continue
+        
         row = signal.loc[date].dropna()
         if len(row) < 20:
             continue

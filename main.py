@@ -335,8 +335,15 @@ total = mr_strength + mom_strength
 w_mr  = (mr_strength / total).fillna(0.5)   # fallback to 50/50 if no history
 w_mom = (mom_strength / total).fillna(0.5)
 
-signal_train = w_mr * mr_train + w_mom * mom_train
+# --- ORTHOGONALISE MOMENTUM vs MR (TRAIN) ---
 
+beta = (mom_train * mr_train).mean(axis=1) / (mr_train**2).mean(axis=1)
+beta = beta.replace([np.inf, -np.inf], 0).fillna(0)
+beta = beta.clip(-5, 5)
+
+mom_orth = mom_train - mr_train.mul(beta, axis=0)
+
+signal_train = w_mr * mr_train + w_mom * mom_orth
 print(f"Signal stats:")
 print(f"  Non-null observations : {signal_train.notna().sum().sum():,}")
 print(f"  Cross-sectional mean  : {signal_train.mean().mean():.4f}  (should be ~0)")
@@ -458,8 +465,15 @@ mom_strength_t = mom_test.abs().rolling(60, min_periods=10).mean()
 total_t        = mr_strength_t + mom_strength_t
 w_mr_t         = (mr_strength_t / total_t).fillna(0.5)
 w_mom_t        = (mom_strength_t / total_t).fillna(0.5)
-signal_test    = w_mr_t * mr_test + w_mom_t * mom_test
+# --- ORTHOGONALISE MOMENTUM vs MR (TEST) ---
 
+beta_t = (mom_test * mr_test).mean(axis=1) / (mr_test**2).mean(axis=1)
+beta_t = beta_t.replace([np.inf, -np.inf], 0).fillna(0)
+beta_t = beta_t.clip(-5, 5)
+
+mom_orth_t = mom_test - mr_test.mul(beta_t, axis=0)
+
+signal_test = w_mr_t * mr_test + w_mom_t * mom_orth_t
 # Portfolio and backtest against RAW test returns
 weights_test = long_short_portfolio(
     signal_test, use_decile=True, returns=test_returns
@@ -521,7 +535,15 @@ def make_signal(idio_df: pd.DataFrame, full_ret: pd.DataFrame) -> pd.DataFrame:
     w_mr         = (mr_strength / total).fillna(0.5)
     w_mom        = (mom_strength / total).fillna(0.5)
 
-    signal = w_mr * mr + w_mom * mom
+    # --- ORTHOGONALISE MOMENTUM vs MR (WF) ---
+
+    beta = (mom * mr).mean(axis=1) / (mr**2).mean(axis=1)
+    beta = beta.replace([np.inf, -np.inf], 0).fillna(0)
+    beta = beta.clip(-5, 5)
+
+    mom_orth = mom - mr.mul(beta, axis=0)
+
+    signal = w_mr * mr + w_mom * mom_orth
     return signal.fillna(0)
 
 
