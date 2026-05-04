@@ -43,19 +43,23 @@ Subsequent runs load from cache.
 | Validation | Walk-forward OOS | Out-of-sample testing across multiple configurations |
 
 ## Output
-  plots/eigenvalue_spectrum.png        — RMT factor count diagnostics
+  plots/beta_diagnostics.png        — Beta distribution, vol reduction, SPY corr
   
-  plots/ic_decay_mean_reversion.png    — MR signal IC by horizon
+  plots/eigenvalue_spectrum.png     — RMT factor count (market-neutral covariance)
   
-  plots/momentum_diagnostics.png       — 6-panel momentum dashboard: IC decay (short+long horizons), Daily IC time series, Top/bottom decile spread, Signal autocorrelation, Cross-sectional dispersion, Rolling ICIR
-                                           
-  plots/signal_comparison_ic.png       — MR vs Momentum vs Combined IC
+  plots/ic_decay_mean_reversion.png — MR signal IC by horizon
   
-  plots/is_performance.png             — in-sample 4-panel dashboard
+  plots/momentum_diagnostics.png    — 6-panel momentum dashboard: IC decay (short+long horizons),Daily IC                                          time series, Top/bottom decile spread, Signal autocorrelation,                                               Cross-sectional dispersion, Rolling ICIR
   
-  plots/oos_performance.png            — out-of-sample 4-panel dashboard
+  plots/signal_comparison_ic.png    — MR vs Momentum vs Combined IC
   
-  plots/walk_forward_performance.png   — Walk-forward out-of-sample dashboard
+  plots/is_performance.png          — In-sample 4-panel dashboard
+  
+  plots/oos_performance.png         — Out-of-sample 4-panel dashboard
+  
+  plots/walk_forward_performance.png— Walk-forward OOS dashboard
+  
+  plots/beta_neutrality.png         — Portfolio beta scatter and rolling beta
   
 ## Requirements
 
