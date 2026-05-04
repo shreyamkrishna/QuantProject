@@ -96,6 +96,12 @@ def build_signal(
     smoothed = decay_signal(ranked, halflife=decay_halflife)
     return rank_signal(smoothed.fillna(0))   # fillna preserves cross-section width
 
+def cross_sectional_momentum_signal(returns, lookback=252, skip=5):
+    """
+    Cross sectional momentum signal aka Carhart momentum
+    """
+    past = returns.shift(skip).rolling(lookback).sum()
+    return rank_signal(past)
 
 def momentum_signal(
     returns: pd.DataFrame,

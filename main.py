@@ -62,6 +62,7 @@ from src.factors    import EigenFactorModel
 from src.portfolio  import (
     build_signal,
     momentum_signal,
+    cross_sectional_momentum_signal,
     combine_signals,
     long_short_portfolio,
     Backtester,
@@ -122,9 +123,8 @@ print(f"Final dataset : {returns.shape[0]} days x {returns.shape[1]} stocks\n")
 # SPY prices are used to estimate rolling beta for each stock.
 # Cached separately to data/spy_prices.parquet.
 spy_prices = get_spy(start=START_DATE, end=END_DATE)
-spy_returns = winsorize_returns(
-    compute_returns(spy_prices, log=False)
-)
+spy_returns = compute_returns(spy_prices, log=False)
+spy_returns = winsorize_returns(spy_returns)
 # .squeeze() ensures we have a Series, not a single-column DataFrame.
 # This matters because rolling_beta() and market_neutral_returns() both
 # call .mul(mkt, axis=0), which requires mkt to be a Series.
@@ -313,12 +313,8 @@ mr_train = build_signal(idio_train_df, lookback=MR_LOOKBACK, decay_halflife=MR_D
 # Reason: momentum captures persistent price trends, including sector trends.
 # Removing the market or sector component would strip out the very trends
 # the signal is trying to capture.
-mom_train = momentum_signal(
-    train_ret_aligned,   # <-- CHANGE HERE
-    fast_window=MOM_FAST,
-    slow_window=MOM_SLOW,
-    skip_days=5,
-)
+mom_train = cross_sectional_momentum_signal(
+    train_ret_aligned)
 
 # ── Dynamic blending ───────────────────────────────────────────────────────────
 # Instead of the fixed 30/70 blend in combine_signals(), we dynamically
@@ -453,8 +449,7 @@ mr_test = build_signal(idio_test_df, lookback=MR_LOOKBACK, decay_halflife=MR_DEC
 # Momentum signal: computed on FULL history (raw returns), sliced to test dates.
 # KEY: we use the full `returns` DataFrame (all dates), then slice.
 # Using only test_returns would give all-NaN because MOM_SLOW=252d > 123d test window.
-mom_test = momentum_signal(returns, fast_window=MOM_FAST,
-                            slow_window=MOM_SLOW, skip_days=5)
+mom_test = cross_sectional_momentum_signal(returns)
 mom_test = mom_test.loc[test_returns.index]   # slice to test dates
 
 # Dynamic blending for test period
@@ -515,11 +510,8 @@ def make_signal(idio_df: pd.DataFrame, full_ret: pd.DataFrame) -> pd.DataFrame:
     mr = build_signal(idio_df, lookback=MR_LOOKBACK, decay_halflife=MR_DECAY)
 
     # Momentum built on full raw returns history, then sliced to test window
-    mom = momentum_signal(
+    mom = cross_sectional_momentum_signal(
         full_ret,
-        fast_window=MOM_FAST,
-        slow_window=MOM_SLOW,
-        skip_days=5,
     )  # align to test window
 
     # Dynamic weighting (same logic as Steps 7 and 10)
